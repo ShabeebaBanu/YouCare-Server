@@ -1,4 +1,5 @@
 import Donation from "../model/Donation.mjs";
+import mongoose from "mongoose";
 
 const donationRepository = {
 
@@ -12,7 +13,37 @@ const donationRepository = {
     },
 
     async getAllDonations() {
-        return await Donation.find({});
+        return await Donation.find({})
+            .populate('category', 'name')
+            .populate('district', 'name')
+            .sort({createdAt : -1});
+    },
+
+    async filterDonation(districtFilter, categoryFilter, userType) {
+        const query = {};
+        
+        if (districtFilter && mongoose.Types.ObjectId.isValid(districtFilter)) {
+            query.district = new mongoose.Types.ObjectId(districtFilter);
+        }
+    
+        if (categoryFilter && mongoose.Types.ObjectId.isValid(categoryFilter)) {
+            query.category = new mongoose.Types.ObjectId(categoryFilter);
+        }
+    
+        if (userType) {
+            query.userType = userType;
+        }
+    
+        if (Object.keys(query).length === 0) {
+            return [];
+        }
+    
+        console.log("Final query:", query);
+    
+        return await Donation.find(query)
+            .populate('category', 'name')
+            .populate('district', 'name')
+            .sort({ createdAt: -1 });
     },
 
     async getDonationsByCreatedBy(createdBy) {
@@ -21,8 +52,11 @@ const donationRepository = {
 
     async updateDonation(donationId, updatedData) {
         return await Donation.findByIdAndUpdate(donationId, updatedData, { new : true })
-    }
+    },
 
+    async deleteDonation(donationId) {
+        return await Donation.deleteOne({ _id: donationId});
+    }
 }
 
 export default donationRepository;

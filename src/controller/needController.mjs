@@ -1,16 +1,19 @@
 import express from "express";
 import needServiceImp from "../service/needServiceImp.mjs";
 import upload, { MAX_IMAGE_LIMIT } from "../Config/multer.mjs";
-
+import { extractToken } from "../service/keycloakService.mjs";
 const needRouter = express.Router();
 
 needRouter.post(
   "/create",
   upload.array("images", MAX_IMAGE_LIMIT),
   async (req, res) => {
+
+    const token = await extractToken(req);
+
     try {
       const formData = req.body;
-
+      console.log("need data: ", formData);
       const images = req.files?.map(file => ({
         data: file.buffer,
         contentType: file.mimetype,
@@ -22,18 +25,21 @@ needRouter.post(
         images
       };
 
-      const need = await needServiceImp.createNeed(needData);
+      console.log("need data: ", needData);
+      const response = await needServiceImp.createNeed(needData, token);
 
-      return res.status(201).json({ message: "Need Created Successfully!", need });
+      return res.status(response.success ? 201 : 400).json(response);
+  
     } catch (error) {
-      console.error("Need creation error:", error);
-      return res.status(500).json({ message: "Error creating Need", error: error.message });
+      const status = error.statusCode || 500;
+      const errorMessage = error.message || "Unexpected Error occured while creating need"
+      return res.status(status).json({ message: errorMessage});
     }
   }
 );
 
 
-needRouter.get("/all", async (res) => {
+needRouter.get("/all", async (req, res) => {
   try {
     const needs = await needServiceImp.getAllNeeds();
     return res.status(200).json({ message: "Fetched all needs successfully!", needs });
@@ -61,7 +67,7 @@ needRouter.get("/:needId", async (req, res) => {
 });
 
 
-needRouter.get("/user/:createdBy", async (req, res) => {
+needRouter.get("/createdBy/:createdBy", async (req, res) => {
     try {
         const needs = await needServiceImp.getNeedsByCreatedBy(req.params.createdBy);
 
@@ -71,7 +77,7 @@ needRouter.get("/user/:createdBy", async (req, res) => {
 
         return res.status(200).json({ message: "Needs fetched successfully!", needs });
     } catch (error) {
-        return res.status(500)({
+        return res.status(500).json({
           message: `Error fetching the needs with ID ${req.params.createdBy}`,
           error: error.message
        });
@@ -89,11 +95,35 @@ needRouter.put("/:needId", async (req, res) => {
 
      return res.status(200).json({ message: "Need updated successfully!", updatedNeed });
   } catch (error) {
-    return res.status(500)({
+    return res.status(500).json({
       message: `Error updating the need with ID ${req.params.needId}`,
       error: error.message
     });
   }
+});
+
+needRouter.get("/filter/create", async (req, res) => {
+  console.log("start");
+  try {
+     
+     const needs = await needServiceImp.getNeedByFilter(req.body);
+
+     return res.status(200).json({ message: "Need filtered successfully!", needs });
+  } catch (error) {
+    return res.status(500).json({
+      message: `Error filtering the needs`,
+      error: error.message
+    });
+  }
+});
+
+needRouter.delete("/:needId", async (req, res) => {
+    try{
+        const need =  await needServiceImp.deleteNeed(req.params.needId);
+        return res.status(201).json({ message: "Need deleted successfullty!", need});
+    }catch(error){
+        return res.status(500).json({ message: "Error deleting Need", error: error.message});
+    }
 });
 
 export default needRouter;

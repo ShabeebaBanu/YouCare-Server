@@ -1,6 +1,7 @@
 import express from "express";
 import donationServiceImp from "../service/donationServiceImp.mjs";
 import upload, { MAX_IMAGE_LIMIT } from "../Config/multer.mjs";
+import { extractToken } from "../service/keycloakService.mjs";
 
 const donationRouter = express.Router();
 
@@ -8,6 +9,9 @@ donationRouter.post(
   "/create",
   upload.array("images", MAX_IMAGE_LIMIT),
   async (req, res) => {
+
+    const token = await extractToken(req);
+
     try {
       const formData = req.body;
 
@@ -22,7 +26,7 @@ donationRouter.post(
         images
       };
 
-      const donation = await donationServiceImp.createDonation(donationData);
+      const donation = await donationServiceImp.createDonation(donationData, token);
 
       return res.status(201).json({ message: "Donation Created Successfully!", donation });
     } catch (error) {
@@ -33,7 +37,7 @@ donationRouter.post(
 );
 
 
-donationRouter.get("/all", async (res) => {
+donationRouter.get("/all", async (req, res) => {
   try {
     const donations = await donationServiceImp.getAllDonations();
     return res.status(200).json({ message: "Fetched all donations successfully!", donations });
@@ -71,11 +75,26 @@ donationRouter.get("/user/:createdBy", async (req, res) => {
 
         return res.status(200).json({ message: "Donations fetched successfully!", donations });
     } catch (error) {
-        return res.status(500)({
+        return res.status(500).json({
           message: `Error fetching the donations with ID ${req.params.createdBy}`,
           error: error.message
        });
     }
+});
+
+donationRouter.get("/filter/create", async (req, res) => {
+  console.log("start");
+  try {
+     
+     const donations = await donationServiceImp.getDonationByFilter(req.body);
+
+     return res.status(200).json({ message: "Donation filtered successfully!", donations });
+  } catch (error) {
+    return res.status(500).json({
+      message: `Error filtering the donations`,
+      error: error.message
+    });
+  }
 });
 
 
@@ -89,11 +108,21 @@ donationRouter.put("/:donationId", async (req, res) => {
 
      return res.status(200).json({ message: "Donation updated successfully!", updatedDonation });
   } catch (error) {
-    return res.status(500)({
+    return res.status(500).json({
       message: `Error updating the donation with ID ${req.params.donationId}`,
       error: error.message
     });
   }
+});
+
+
+donationRouter.delete("/:donationId", async (req, res) => {
+    try{
+        const donation =  await donationServiceImp.deleteDonation(req.params.donationId);
+        return res.status(201).json({ message: "Donation deleted successfullty!", donation});
+    }catch(error){
+        return res.status(500).json({ message: "Error deleting Donation", error});
+    }
 });
 
 export default donationRouter;

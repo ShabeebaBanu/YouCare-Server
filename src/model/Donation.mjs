@@ -19,6 +19,10 @@ const donationSchema = new Schema({
         type: String, 
         required: true 
     },
+    item: {
+        type: String, 
+        required: true 
+    },
     description: { 
         type: String, 
         required: true 
@@ -33,7 +37,7 @@ const donationSchema = new Schema({
         required: true 
     },
     category: {
-        type: Schema.Types.ObjectId,
+        type: mongoose.Schema.Types.ObjectId,
         ref: "Category",
         required: true
     },
@@ -48,9 +52,18 @@ const donationSchema = new Schema({
     pickupAddress: {
         type: String
     },
+    district: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "District",
+        required: true
+    },
     delivary: {
         type: String,
         enum: Object.values(delivaryModeEnum)
+    },
+    userType: {
+        type: String,
+        required: true
     },
     images: {
        type: [{

@@ -15,7 +15,7 @@ categoryRouter.post("/create", async (req, res) => {
 categoryRouter.get("/all", async (req, res) => {
     try{
         const categories =  await categoryServiceImp.getAllCategories();
-        return res.status(201).json({ message: "Fetched all categories successfullty!", categories});
+        return res.status(201).json({ message: "Fetched all categories successfully!", categories});
     }catch(error){
         return res.status(500).json({ message: "Error fetching Categories", error});
     }

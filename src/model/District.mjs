@@ -5,6 +5,10 @@ export const districtSchema = new Schema({
     name: {
         type: String, 
         required: true 
+    },
+    province: {
+        type: String,
+        required: true
     }
 });
 

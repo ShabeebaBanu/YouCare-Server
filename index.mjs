@@ -5,12 +5,15 @@ import KeycloakConnect from "keycloak-connect";
 import cors from 'cors';
 import SwaggerDocs from "./src/Config/swagger.mjs";
 import swaggerUi from "swagger-ui-express";
+import redisClient from "./src/Config/redis.mjs";
 
 import userRouter from "./src/controller/userController.mjs";
 import donationRouter from "./src/controller/donationController.mjs";
 import categoryRouter from "./src/controller/categoryController.mjs";
 import needRouter from "./src/controller/needController.mjs";
 import districtRouter from "./src/controller/districtController.mjs";
+import wishListRoute from "./src/controller/needWishListController.mjs";
+import donationRequest from "./src/controller/donationRequestController.mjs";
 
 
 dotenv.config();
@@ -35,22 +38,34 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(SwaggerDocs));
 const PORT = process.env.PORT || 8000;
 
 //Route
-app.use("/api/user", keycloak.protect('realm:admin'), userRouter);
+//app.use("/api/user", keycloak.protect('realm:admin'), userRouter);
+app.use("/api/user", userRouter);
 app.use("/api/donation", donationRouter);
 app.use("/api/category", categoryRouter);
 app.use("/api/need", needRouter);
 app.use("/api/district", districtRouter);
+app.use("/api/wishlist", wishListRoute);
+app.use("/api/request", donationRequest);
 
-//Ensure server and db connection
-connectMongoDB()
-.then(() => {
+//Ensure server and db connection and Redis connection
+async function startServer() {
+  try {
+    await connectMongoDB();
+    console.log("MongoDB connected");
+
+    await redisClient.ping();
+    console.log("Redis connection verified");
+
     app.listen(PORT, () => {
-        console.log(`Running on PORT ${PORT}`);
-    })
-})
-.catch((err) => {
-    console.log("Mongo DB Connection error : ", err);
-})
+      console.log(`Server running on PORT ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Startup error:", err);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 
 

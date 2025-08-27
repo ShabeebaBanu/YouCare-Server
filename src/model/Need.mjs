@@ -6,12 +6,22 @@ export const needStatusEnum = {
   AVAILABLE: "AVAILABLE",
   PENDING: "PENDING",
   COMPLETED: "COMPLETED",
-}
+};
+
+export const delivaryModeEnum = {
+  YES: "Yes",
+  NO: "No",
+  VOLUNTEER: "Volunteer",
+};
 
 const needScheme = new Schema({
     title: { 
         type: String,
         required: true
+    },
+    item: {
+        type: String, 
+        required: true 
     },
     description: {
         type: String,
@@ -24,6 +34,35 @@ const needScheme = new Schema({
     },
     quantity: {
         type: Number,
+        required: true
+    },
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category",
+        required: true
+    },
+    needyName: {
+        type: String,
+        required: true
+    },
+    needyPhone: {
+        type: String,
+        required: true
+    },
+    delivaryAddress: {
+        type: String
+    },
+    district: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "District",
+        required: true
+    },
+    delivary: {
+        type: String,
+        enum: Object.values(delivaryModeEnum)
+    },
+    userType: {
+        type: String,
         required: true
     },
     images: {

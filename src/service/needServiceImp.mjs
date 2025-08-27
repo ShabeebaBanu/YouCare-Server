@@ -1,10 +1,35 @@
 import needRepository from "../repository/needRepository.mjs";
 import ResourceNotFoundException from "../exceptions/resourceNotFoundException.mjs";
 import { needStatusEnum } from "../model/Need.mjs";
+import categoryServiceImp from "./categoryServiceImp.mjs";
+import { extractUserRole } from "./keycloakService.mjs";
 
 const needServiceImp = {
-    async createNeed(needData) {
-        return await needRepository.createNeed(needData);
+    async createNeed(needData, token) {
+
+        const categoryName = needData.category;
+        const category = await categoryServiceImp.isCategoryExistByName(categoryName);
+
+        if (!category) {
+            category = await categoryServiceImp.createCategory({ name : categoryName});
+        }
+
+        const userRole =await extractUserRole(token);
+        if (!userRole.success) {
+            throw new Error(userRole.message);
+        }
+        
+        try {
+            const response = await needRepository.createNeed({
+                ...needData, 
+                category: category._id,
+                userType: userRole.message[0]
+            });
+            return { success: true, message: response}
+        } catch (error) {
+            const errorMessage = error.message || "Unexpected Error occured while creating user"
+            throw new Error(errorMessage); 
+        }
     },
 
     async getNeedByNeedId(needId) {
@@ -31,7 +56,19 @@ const needServiceImp = {
        }
 
        return await needRepository.updateNeed(needId, updatedNeed);
+    },
+
+    async getNeedByFilter(filterData) {
+    
+       const response = needRepository.filterNeeds(filterData.district, filterData.category, filterData.userType);
+       console.log(response);
+       return response;
+    },
+
+    async deleteNeed(needId) {
+        return await needRepository.deleteNeed(needId);
     }
-}
+    
+};
 
 export default needServiceImp;

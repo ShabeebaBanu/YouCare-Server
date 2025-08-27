@@ -1,17 +1,54 @@
-import express from "express";
+import express, { response } from "express";
 import userServiceImp from "../service/userServiceImp.mjs";
+import BadRequestException from "../exceptions/BadRequestException.mjs";
 
 const userRouter = express.Router();
 
-//need to check email already exist
 userRouter.post("/create", async (req, res) => {
     try{
-        const user = await userServiceImp.createUser(req.body);
-        return res.status(201).json({ message: "User Created successfully!", user});
+        if (!req.body.email || req.body.email == "") {
+           throw new BadRequestException("Email is Required");
+        }
+
+        const response = await userServiceImp.createUser(req.body);
+        return res.status(response.success ? 201 : 400).json(response);
     }catch(error){
-        return res.status(500).json({ message: "Error creating user", error});
+        const status = error.statusCode || 500;
+        const errorMessage = error.message || "Unexpected Error occured while creating user"
+        return res.status(status).json({ message: errorMessage});
     }
     
+});
+
+userRouter.post("/otp", async (req, res) => {
+    try{
+        const response = await userServiceImp.sendOtp(req.body.email);
+        return res.status(response.success ? 200 : 400).json(response);
+    } catch (error) {
+        const status = error.statusCode || 500;
+        const errorMessage = error.message || "Unexpected Error occured while sending OTP"
+        console.error("Error in /otp:", errorMessage);
+        return res.status(status).json({ success: false, message: errorMessage });
+    }
+});
+
+userRouter.post("/verify/otp", async (req, res) => {
+    if (!req.body.otp || req.body.otp == "") {
+        return res.status(400).json({ success: false, message: "OTP cannot be null" });
+    }
+
+    if (!req.body.email || req.body.email == "") {
+        return res.status(400).json({ success: false, message: "Email cannot be null" });
+    }
+
+    try {
+        const response = await userServiceImp.verifyOtp(req.body.email, req.body.otp);
+        return res.status(response.success ? 200 : 400).json(response);
+    } catch (error) {
+        const errorMessage = error.message || "Unexpected Error occured while verfying OTP"
+        console.error("Error in /verify/otp:", errorMessage);
+        return res.status(500).json({ success: false, message: errorMessage });
+    }
 });
 
 userRouter.get("/all", async (req, res) => {
