@@ -1,6 +1,7 @@
-import express, { response } from "express";
+import express from "express";
 import userServiceImp from "../service/userServiceImp.mjs";
 import BadRequestException from "../exceptions/BadRequestException.mjs";
+import { extractToken } from "../service/keycloakService.mjs";
 
 const userRouter = express.Router();
 
@@ -17,13 +18,14 @@ userRouter.post("/create", async (req, res) => {
         const errorMessage = error.message || "Unexpected Error occured while creating user"
         return res.status(status).json({ message: errorMessage});
     }
-    
 });
 
 userRouter.post("/otp", async (req, res) => {
     try{
         const response = await userServiceImp.sendOtp(req.body.email);
-        return res.status(response.success ? 200 : 400).json(response);
+        const test = res.status(response.success ? 200 : 400).json(response);
+        console.log("test:", test);
+        return test;
     } catch (error) {
         const status = error.statusCode || 500;
         const errorMessage = error.message || "Unexpected Error occured while sending OTP"
@@ -61,14 +63,59 @@ userRouter.get("/all", async (req, res) => {
 });
 
 userRouter.get("/:userId", async (req, res) => {
+    if (!req.params.userId) {
+        throw new BadRequestException("UserId cannot be null");
+    }
+
+    const token = await extractToken(req);
+
     try{
-        const user = await userServiceImp.getUserByUserId(req.params.userId);
-        if(!user){
-            return res.status(404).json({ message: `User with ID ${req.params.userId} not found`});
-        }
-        return res.status(201).json({ message: "User fetched successfully!", user});
+        const response = await userServiceImp.getUserByUserId(req.params.userId, token);
+        return res.status(response.success ? 200 : 400).json(response);
     }catch(error){
-        return res.status(500).json({ message: `Error fetching the user with ID ${req.params.userId}`});
+        const status = error.statusCode || 500;
+        const errorMessage = error.message || "Unexpected Error occured while fetching user"
+        return res.status(status).json({ message: errorMessage});
+    }
+});
+
+userRouter.put("/update/:userId", async (req, res) => {
+    try{
+        if (!req.params.userId) {
+           throw new BadRequestException("UserId is Required");
+        }
+
+        if (!req.body) {
+            throw new BadRequestException("Updated user data cannot be null")
+        }
+
+        const token = await extractToken(req);
+        console.log("request: ", req);
+        const response = await userServiceImp.updateUser(req.params.userId, req.body, token);
+        return res.status(response.success ? 200 : 400).json(response);
+    }catch(error){
+        const status = error.statusCode || 500;
+        const errorMessage = error.message || "Unexpected Error occured while updating user"
+        return res.status(status).json({ message: errorMessage});
+    }
+});
+
+userRouter.put("/reset-password/:email", async (req, res) => {
+    if (!req.params.email || req.params.email == "") {
+        throw new BadRequestException("Email cannot be null/empty");
+    }
+    
+    if (!req.body.newPassword || req.body.newPassword == "") {
+        throw new BadRequestException("Password cannot be null/empty");
+    }
+
+    try{
+        const response = await userServiceImp.resetPassword(req.params.email, req.body.newPassword);
+        return res.status(response.success ? 200 : 400).json(response);
+    }catch(error){
+        const status = error.statusCode || 500;
+        const errorMessage = error.message || "Unexpected Error occured while reseting password"
+        return res.status(status).json({ message: errorMessage});
     }
 });
 

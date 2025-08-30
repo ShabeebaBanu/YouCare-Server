@@ -17,7 +17,7 @@ const needServiceImp = {
             category = await categoryServiceImp.createCategory({ name : categoryName});
         }
 
-        const userRole =await extractUserRole(token);
+        const userRole = await extractUserRole(token)
         if (!userRole.success) {
             throw new Error(userRole.message);
         }

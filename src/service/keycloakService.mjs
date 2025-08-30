@@ -105,14 +105,18 @@ export async function AssignRole(userId, rolePayload) {
     // );
 
     // const role = roleRes.data;
+    try {
+        await axios.post(
+            `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}/role-mappings/clients/${process.env.KEYCLOAK_CLIENT_ID}`,
+            [rolePayload],
+            { headers: { Authorization: `Bearer ${adminToken}` } }
+        );
 
-    await axios.post(
-        `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}/role-mappings/clients/${process.env.KEYCLOAK_CLIENT_ID}`,
-        [rolePayload],
-        { headers: { Authorization: `Bearer ${adminToken}` } }
-    );
-
-    return { success: true, message: "Client role assigned successfully", userId };
+        return { success: true, message: "Client role assigned successfully", userId };
+    } catch (error) {
+        throw new KeycloakErrorException(error.response.data.errorMessage);
+    }
+    
 }
 
 
@@ -135,8 +139,26 @@ export async function isEmailAlreadyRegistered(email) {
     }   
 };
 
+export async function getUserDetailsByEmail(email) {
+
+    const adminToken = await getAdminToken();
+
+    try {
+        const response = await axios.get(
+        `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users`,
+              {
+                headers: { Authorization: `Bearer ${adminToken}` },
+                params: { email }
+              }
+        );
+        return response.data;
+
+    } catch (error) {
+        throw new KeycloakErrorException(error.response.data.errorMessage);
+    }   
+};
+
 export async function extractUserRole(token) {
-    console.log("token: ", token);
     const decoded = jwt.decode(token, {complete: true});
 
     if (!decoded) {
@@ -150,7 +172,7 @@ export async function extractUserRole(token) {
 };
 
 export async function extractToken(request) {
-    
+    console.log("request: ", request);
     const authHeader = request.headers["authorization"];
     if (!authHeader) {
       return { success: false, message: "Missing Authorization header"};
@@ -175,4 +197,50 @@ export async function getUserDetailsByUserId(userId) {
     } catch (error) {
         throw new KeycloakErrorException(error.response.data.errorMessage);
     } 
+};
+
+export async function updateUserDetailsByUserId(userId, updatedData) {
+    const adminToken = await getAdminToken();
+
+    try {
+        const response = await axios.put(
+        `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
+        updatedData,
+              {
+                headers: { Authorization: `Bearer ${adminToken}` }
+              }
+        );
+    
+        return response.data;
+
+    } catch (error) {
+        throw new KeycloakErrorException(error.response.data.errorMessage);
+    } 
+};
+
+export async function resetUserPassword(userId, newPassword) {
+  const adminToken = await getAdminToken();
+
+  try {
+    const response = await axios.put(
+      `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}/reset-password`,
+      {
+        type: "password",
+        value: newPassword,
+        temporary: false,
+      },
+      {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      }
+    );
+
+    if (response.status === 204) {
+      return { success: true, message: "Password updated successfully" };
+    } else {
+      return { success: false, status: response.status, message: "Unexpected response status" };
+    }
+  } catch (error) {
+    throw new KeycloakErrorException(error.response?.data || error.message);
+  }
 }
+
