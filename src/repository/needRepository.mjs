@@ -20,6 +20,14 @@ const needRepository = {
         ;
     },
 
+    async getNearbyNeeds(districtId) {
+        const districtObjectId = new mongoose.Types.ObjectId(districtId);
+        return await Need.find({ district : districtObjectId})
+        .populate('category', 'name')
+        .populate('district', 'name')
+        .sort({createdAt : -1})
+    },
+
     async filterNeeds(districtFilter, categoryFilter, userType) {
         const query = {};
     

@@ -136,7 +136,7 @@ export async function isEmailAlreadyRegistered(email) {
 };
 
 export async function extractUserRole(token) {
-
+    console.log("token: ", token);
     const decoded = jwt.decode(token, {complete: true});
 
     if (!decoded) {
@@ -158,4 +158,21 @@ export async function extractToken(request) {
     
     const token = authHeader.split(" ")[1];
     return token;
+};
+
+export async function getUserDetailsByUserId(userId) {
+    const adminToken = await getAdminToken();
+
+    try {
+        const response = await axios.get(
+        `${process.env.KEYCLOAK_URL}/admin/realms/${process.env.KEYCLOAK_REALM}/users/${userId}`,
+              {
+                headers: { Authorization: `Bearer ${adminToken}` }
+              }
+        );
+        return response.data;
+
+    } catch (error) {
+        throw new KeycloakErrorException(error.response.data.errorMessage);
+    } 
 }

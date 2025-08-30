@@ -19,6 +19,14 @@ const donationRepository = {
             .sort({createdAt : -1});
     },
 
+    async getNearbyDonations(districtId) {
+        const districtObjectId = new mongoose.Types.ObjectId(districtId);
+        return await Donation.find({ district : districtObjectId})
+            .populate('category', 'name')
+            .populate('district', 'name')
+            .sort({createdAt : -1})
+    },
+
     async filterDonation(districtFilter, categoryFilter, userType) {
         const query = {};
         

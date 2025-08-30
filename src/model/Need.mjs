@@ -61,10 +61,7 @@ const needScheme = new Schema({
         type: String,
         enum: Object.values(delivaryModeEnum)
     },
-    userType: {
-        type: String,
-        required: true
-    },
+    
     images: {
         type: [{
         data: Buffer, 

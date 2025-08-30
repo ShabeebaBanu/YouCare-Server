@@ -102,7 +102,7 @@ needRouter.put("/:needId", async (req, res) => {
   }
 });
 
-needRouter.get("/filter/create", async (req, res) => {
+needRouter.post("/filter/create", async (req, res) => {
   console.log("start");
   try {
      
@@ -114,6 +114,17 @@ needRouter.get("/filter/create", async (req, res) => {
       message: `Error filtering the needs`,
       error: error.message
     });
+  }s
+});
+
+needRouter.get("/nearby/user/:userId", async (req, res) => {
+  try {
+    const response = await needServiceImp.getNearbyNeeds(req.params.userId);
+    return res.status(response.success ? 201 : 400).json(response);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    const errorMessage = error.message || "Unexpected Error occured while fetching nearby needs"
+    return res.status(status).json({ message: errorMessage});
   }
 });
 

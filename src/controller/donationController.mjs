@@ -82,7 +82,7 @@ donationRouter.get("/user/:createdBy", async (req, res) => {
     }
 });
 
-donationRouter.get("/filter/create", async (req, res) => {
+donationRouter.post("/filter/create", async (req, res) => {
   console.log("start");
   try {
      
@@ -112,6 +112,17 @@ donationRouter.put("/:donationId", async (req, res) => {
       message: `Error updating the donation with ID ${req.params.donationId}`,
       error: error.message
     });
+  }
+});
+
+donationRouter.get("/nearby/user/:userId", async (req, res) => {
+  try {
+    const response = await donationServiceImp.getNearbyDonations(req.params.userId);
+    return res.status(response.success ? 201 : 400).json(response);
+  } catch (error) {
+    const status = error.statusCode || 500;
+    const errorMessage = error.message || "Unexpected Error occured while fetching nearby donations"
+    return res.status(status).json({ message: errorMessage});
   }
 });
 

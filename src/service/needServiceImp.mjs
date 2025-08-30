@@ -2,7 +2,10 @@ import needRepository from "../repository/needRepository.mjs";
 import ResourceNotFoundException from "../exceptions/resourceNotFoundException.mjs";
 import { needStatusEnum } from "../model/Need.mjs";
 import categoryServiceImp from "./categoryServiceImp.mjs";
-import { extractUserRole } from "./keycloakService.mjs";
+import districtRepository from "../repository/districtRepository.mjs";
+import { extractUserRole,
+         getUserDetailsByUserId
+ } from "./keycloakService.mjs";
 
 const needServiceImp = {
     async createNeed(needData, token) {
@@ -59,10 +62,54 @@ const needServiceImp = {
     },
 
     async getNeedByFilter(filterData) {
-    
        const response = needRepository.filterNeeds(filterData.district, filterData.category, filterData.userType);
        console.log(response);
        return response;
+    },
+
+    async getNearbyNeeds(userId) {
+        console.log("inside getnearby need")
+        if (!userId || userId === "") {
+            throw new ResourceNotFoundException("userId cannot be null");
+        }
+
+        try {
+            const userDetails = await getUserDetailsByUserId(userId);
+            if (!userDetails) {
+                return { success: false, message: "No user data found" };
+            }
+
+            const district = userDetails.attributes.district[0] || "";
+            console.log("district: ", district);
+
+            if (!district ) {
+                return { success: false, message: "User has no location info" };
+            }
+
+            const districtData = await districtRepository.getDistrictByName(district);
+            console.log("districtData: ", districtData);
+            if (!districtData) {
+                return { success: false, message: "No Needies Near By Your Location "+ districtData.name };
+            }
+            const districtId = districtData._id;
+            console.log("districtId: ", districtId);
+
+            const nearByNeeds = await needRepository.getNearbyNeeds(districtId);
+            console.log("nearby need response: ", nearByNeeds);
+
+            if (!nearByNeeds || nearByNeeds.length === 0) {
+                return { success: false, message: "No nearby needs found", data:[] };
+            }
+
+            return {
+                success: true,
+                message: "Nearby needs fetched successfully",
+                data: nearByNeeds
+            };
+
+        } catch (error) {
+            throw new Error(error.message || "Unexpected error occurred while fetching nearby needs");
+        }
     },
 
     async deleteNeed(needId) {

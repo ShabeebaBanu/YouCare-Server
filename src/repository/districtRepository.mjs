@@ -11,6 +11,12 @@ const districtRepository = {
         return await District.findById(districtId);
     },
 
+   async getDistrictByName(districtName) {
+        return await District.findOne({
+            name: { $regex: new RegExp(`^${districtName}$`, 'i') } 
+        });
+    },
+
     async getAllDistricts() {
         return await District.find({});
     }
