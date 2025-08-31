@@ -9,7 +9,10 @@ const donationRepository = {
     },
 
     async getDonationByDonationId(donationId) {
-        return await Donation.findById(donationId);
+        return await Donation.findById(donationId)
+           .populate('category', 'name')
+           .populate('district', 'name')
+           .sort({createdAt : -1});
     },
 
     async getAllDonations() {
@@ -54,8 +57,11 @@ const donationRepository = {
             .sort({ createdAt: -1 });
     },
 
-    async getDonationsByCreatedBy(createdBy) {
-        return await Donation.find({ createdBy });
+     async getDonationsByCreatedBy(createdBy) {
+        return await Donation.find({createdBy})
+            .populate('category', 'name')
+            .populate('district', 'name')
+            .sort({ updatedAt: -1 });
     },
 
     async updateDonation(donationId, updatedData) {

@@ -6,6 +6,7 @@ import { extractUserRole,
          getUserDetailsByUserId
 } from "./keycloakService.mjs";
 import districtRepository from "../repository/districtRepository.mjs";
+import BadRequestException from "../exceptions/BadRequestException.mjs";
 
 const donationServiceImp = {
   async createDonation(donationData, token) {
@@ -44,26 +45,42 @@ const donationServiceImp = {
     return await donationRepository.getAllDonations();
   },
 
-  async getDonationsByCreatedBy(createdBy) {
-    return await donationRepository.getDonationsByCreatedBy(createdBy);
-  },
-
   async updateDonation(donationId, updatedData) {
-    const existingDonation = donationRepository.getDonationByDonationId(donationId);
-
+    const existingDonation = await donationRepository.getDonationByDonationId(donationId);
     if (!existingDonation) {
-      throw new ResourceNotFoundException(`No Donation Found With ID ${donationId}`);
+      throw new ResourceNotFoundException("No Donation found with ID : ", donationId);
     }
 
     if (existingDonation.status !== donationStatusEnum.AVAILABLE) {
       throw new ResourceNotFoundException("Donation Cannot Be Updated, As Donation Is In_Process Or Already Completed");
     }
 
-    return await donationRepository.updateDonation(donationId, updatedData);
+    const categoryName = updatedData.category;
+    const category = await categoryServiceImp.isCategoryExistByName(categoryName);
+
+    if (!category) {
+      category = await categoryServiceImp.createCategory({ name : categoryName});
+    }
+
+    try {
+       const response = await donationRepository.updateDonation(
+        donationId, 
+        {
+        ...updatedData,
+        category: category._id}
+      );
+       if (!response) {
+          return { success: false, message: "Failed to update donation" };
+       }
+       return { success: true, message: "Donation updated", data: response };
+
+    } catch(error) {
+      const errorMessage = error.message || "Unexpected Error occured while updating donation"
+      throw new Error(errorMessage); 
+    }
   },
 
   async getNearbyDonations(userId) {
-      console.log("inside get nearby donations")
       if (!userId || userId === "") {
           throw new ResourceNotFoundException("userId cannot be null");
       }
@@ -106,18 +123,44 @@ const donationServiceImp = {
           throw new Error(error.message || "Unexpected error occurred while fetching nearby donations");
       }
   },
+
+  async getDonationsByCreatedBy(createdBy) {
+      const userDetails = await getUserDetailsByUserId(createdBy);
+      if (!userDetails) {
+          return { success: false, message: "No user found with ID ", createdBy };
+      }
+  
+      try {
+        const response = await donationRepository.getDonationsByCreatedBy(createdBy);
+        console.log("response: ", response);
+      if (!response.length > 0 || !response) {
+        return {success: false, message: "No donations found", data: []}
+      }
+        return {success: true, message: "donations fetched successfully", data: response}
+      } catch (error) {
+        const errorMessage = error.message || "Unexpected Error occured while fetching donation"
+        throw new Error(errorMessage); 
+      }    
+  },
   
 
   async deleteDonation(donationId) {
-    return await donationRepository.deleteDonation(donationId);
-  },
-
-  async getDonationByFilter(filterData) {
-    
-  const response = donationRepository.filterDonation(filterData.district, filterData.category, filterData.userType);
-  console.log(response);
-  return response;
-},
+      const donationDetail = await donationRepository.getDonationByDonationId(donationId);
+      if (!donationDetail) {
+          throw new ResourceNotFoundException("No donation found with ID : ", donationId);
+      }
+      
+      const donationStatus = donationDetail.status;
+      if (donationStatus == donationStatusEnum.PENDING) {
+        throw new BadRequestException("Donation Cannot be deleted, As Donation Is In_Process");
+      }
+  
+      const response = await donationRepository.deleteDonation(donationId);
+      if (response.deletedCount === 0) {
+        return { success: false, message: "No Donation found with ID : " + donationId };
+      }
+      return { success: true, message: "Donation deleted successfully" }; 
+  }
 
 };
 

@@ -6,6 +6,7 @@ import districtRepository from "../repository/districtRepository.mjs";
 import { extractUserRole,
          getUserDetailsByUserId
  } from "./keycloakService.mjs";
+import BadRequestException from "../exceptions/BadRequestException.mjs";
 
 const needServiceImp = {
     async createNeed(needData, token) {
@@ -44,21 +45,57 @@ const needServiceImp = {
     },
 
     async getNeedsByCreatedBy(createdBy) {
-        return await needRepository.getNeedsByCreatedBy(createdBy);
+        const userDetails = await getUserDetailsByUserId(createdBy);
+        if (!userDetails) {
+            return { success: false, message: "No user found with ID ", createdBy };
+        }
+
+        try {
+            const response = await needRepository.getNeedsByCreatedBy(createdBy);
+            console.log("respomse: ", response);
+            if (!response.length > 0 || !response) {
+                return {success: false, message: "No needs found", data: []}
+            }
+            return {success: true, message: "needs fetched successfully", data: response}
+        } catch (error) {
+            const errorMessage = error.message || "Unexpected Error occured while fetching needs"
+            throw new Error(errorMessage); 
+        }    
     },
 
-    async updateNeed(needId, updatedNeed) {
-       const existingNeed = needRepository.getNeedByNeedId(needId);
-
-       if (!existingNeed) {
-         throw new ResourceNotFoundException(`No Need Found With ID ${needId}`);
-       }
-
-       if (existingNeed.status !== needStatusEnum.AVAILABLE) {
-         throw new ResourceNotFoundException("Need Cannot Be Updated, As Need Is In_Process Or Already Completed");
-       }
-
-       return await needRepository.updateNeed(needId, updatedNeed);
+    async updateNeed(needId, updatedData) {
+        const existingNeed = await needRepository.getNeedByNeedId(needId);
+        if (!existingNeed) {
+          throw new ResourceNotFoundException("No Need found with ID : ", needId);
+        }
+    
+        if (existingNeed.status !== needStatusEnum.AVAILABLE) {
+          throw new ResourceNotFoundException("Need Cannot Be Updated, As Need Is In_Process Or Already Completed");
+        }
+    
+        const categoryName = updatedData.category;
+        const category = await categoryServiceImp.isCategoryExistByName(categoryName);
+    
+        if (!category) {
+          category = await categoryServiceImp.createCategory({ name : categoryName});
+        }
+    
+        try {
+           const response = await needRepository.updateNeed(
+            needId, 
+            {
+            ...updatedData,
+            category: category._id}
+          );
+           if (!response) {
+              return { success: false, message: "Failed to update Need" };
+           }
+           return { success: true, message: "Need updated", data: response };
+    
+        } catch(error) {
+          const errorMessage = error.message || "Unexpected Error occured while updating Need"
+          throw new Error(errorMessage);
+        }
     },
 
     async getNeedByFilter(filterData) {
@@ -113,9 +150,22 @@ const needServiceImp = {
     },
 
     async deleteNeed(needId) {
-        return await needRepository.deleteNeed(needId);
+        const needDetail = await needRepository.getNeedByNeedId(needId);
+        if (!needDetail) {
+            throw new ResourceNotFoundException("No need found with ID : ", needId);
+        }
+        
+        const needStatus = needDetail.status;
+        if (needStatus != needStatusEnum.AVAILABLE) {
+            throw new BadRequestException("Need Cannot be deleted, As Need Is In_Process Or Already Completed");
+        }
+
+        const response = needRepository.deleteNeed(needId);
+        if (response.deletedCount === 0) {
+            return { success: false, message: "No Need found with ID : " + needId };
+        }
+        return { success: true, message: "Need deleted successfully" }; 
     }
-    
 };
 
 export default needServiceImp;

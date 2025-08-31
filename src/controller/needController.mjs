@@ -2,6 +2,7 @@ import express from "express";
 import needServiceImp from "../service/needServiceImp.mjs";
 import upload, { MAX_IMAGE_LIMIT } from "../Config/multer.mjs";
 import { extractToken } from "../service/keycloakService.mjs";
+import BadRequestException from "../exceptions/BadRequestException.mjs";
 const needRouter = express.Router();
 
 needRouter.post(
@@ -68,14 +69,18 @@ needRouter.get("/:needId", async (req, res) => {
 
 
 needRouter.get("/createdBy/:createdBy", async (req, res) => {
-    try {
-        const needs = await needServiceImp.getNeedsByCreatedBy(req.params.createdBy);
+    if (!req.params.createdBy || req.params.createdBy == "") {
+      throw new BadRequestException("CreatedBy Cannot be null/empty");
+    }
 
-        if (needs == null) {
-            return res.status(404).json({ message: `No Needs found with user ID ${req.params.createdBy}` })
+    try {
+        const response = await needServiceImp.getNeedsByCreatedBy(req.params.createdBy);
+
+        if (!response.success) {
+          return res.status(404).json(response)
         }
 
-        return res.status(200).json({ message: "Needs fetched successfully!", needs });
+        return res.status(200).json(response);
     } catch (error) {
         return res.status(500).json({
           message: `Error fetching the needs with ID ${req.params.createdBy}`,
@@ -86,14 +91,22 @@ needRouter.get("/createdBy/:createdBy", async (req, res) => {
 
 
 needRouter.put("/:needId", async (req, res) => {
+  if (!req.params.needId || req.params.needId == "") {
+    throw new BadRequestException("Need ID cannot be null");
+  }
+
+  if (!req.body || Object.keys(req.body).length === 0) {
+    throw new BadRequestException("Updated need information not found");
+  }
+  console.log("request body: ", req.body);
+
   try {
-     const updatedNeed = await needServiceImp.updateNeed(req.params.needId, req.body);
+     const response = await needServiceImp.updateNeed(req.params.needId, req.body);
 
-     if (updatedNeed == null) {
-          return res.status(404).json({ message: `No Need found with ID ${req.params.needId}`})
+     if (!response.success) {
+        return res.status(response.success ? 200 : 400).json(response);
      }
-
-     return res.status(200).json({ message: "Need updated successfully!", updatedNeed });
+    return res.status(response.success ? 201 : 400).json(response);
   } catch (error) {
     return res.status(500).json({
       message: `Error updating the need with ID ${req.params.needId}`,
@@ -129,11 +142,17 @@ needRouter.get("/nearby/user/:userId", async (req, res) => {
 });
 
 needRouter.delete("/:needId", async (req, res) => {
+    if (!req.params.needId || req.params.needId == "") {
+       throw new BadRequestException("Need ID cannot be null/empty");
+    }
+
     try{
-        const need =  await needServiceImp.deleteNeed(req.params.needId);
-        return res.status(201).json({ message: "Need deleted successfullty!", need});
+        const response =  await needServiceImp.deleteNeed(req.params.needId);
+        return res.status(response.success ? 200 : 400).json(response);
     }catch(error){
-        return res.status(500).json({ message: "Error deleting Need", error: error.message});
+      const status = error.statusCode || 500;
+      const errorMessage = error.message || "Unexpected Error occured while deleting need"
+      return res.status(status).json({ message: errorMessage});
     }
 });
 

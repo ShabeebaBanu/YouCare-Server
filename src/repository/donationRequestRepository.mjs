@@ -1,3 +1,4 @@
+import Donation from "../model/Donation.mjs";
 import DonationRequest from "../model/DonationRequest.mjs";
 
 const donationRequestRepository = {

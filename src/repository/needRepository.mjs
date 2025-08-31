@@ -9,7 +9,10 @@ const needRepository = {
     },
 
     async getNeedByNeedId(needId) {
-        return await Need.findById(needId);
+        return await Need.findById(needId)
+           .populate('category', 'name')
+           .populate('district', 'name')
+           .sort({createdAt : -1});
     },
 
     async getAllNeeds() {
@@ -56,7 +59,10 @@ const needRepository = {
     },
 
     async getNeedsByCreatedBy(createdBy) {
-        return await Need.find({createdBy});
+        return await Need.find({createdBy})
+            .populate('category', 'name')
+            .populate('district', 'name')
+            .sort({ updatedAt: -1 });
     },
 
     async updateNeed(needId, updatedNeed) {

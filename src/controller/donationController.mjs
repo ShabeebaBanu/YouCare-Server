@@ -2,6 +2,7 @@ import express from "express";
 import donationServiceImp from "../service/donationServiceImp.mjs";
 import upload, { MAX_IMAGE_LIMIT } from "../Config/multer.mjs";
 import { extractToken } from "../service/keycloakService.mjs";
+import BadRequestException from "../exceptions/BadRequestException.mjs";
 
 const donationRouter = express.Router();
 
@@ -65,15 +66,19 @@ donationRouter.get("/:donationId", async (req, res) => {
 });
 
 
-donationRouter.get("/user/:createdBy", async (req, res) => {
-    try {
-        const donations = await donationServiceImp.getDonationsByCreatedBy(req.params.createdBy);
+donationRouter.get("/createdBy/:createdBy", async (req, res) => {
+    if (!req.params.createdBy || req.params.createdBy == "") {
+      throw new BadRequestException("CreatedBy Cannot be null/empty");
+    }
 
-        if (donations == null) {
-            return res.status(404).json({ message: `No Donations found with user ID ${req.params.createdBy}` })
+    try {
+        const response = await donationServiceImp.getDonationsByCreatedBy(req.params.createdBy);
+
+        if (!response.success) {
+          return res.status(404).json(response)
         }
 
-        return res.status(200).json({ message: "Donations fetched successfully!", donations });
+        return res.status(200).json(response);
     } catch (error) {
         return res.status(500).json({
           message: `Error fetching the donations with ID ${req.params.createdBy}`,
@@ -99,14 +104,22 @@ donationRouter.post("/filter/create", async (req, res) => {
 
 
 donationRouter.put("/:donationId", async (req, res) => {
+  if (!req.params.donationId || req.params.donationId == "") {
+    throw new BadRequestException("Donation ID cannot be null");
+  }
+
+  if (!req.body || Object.keys(req.body).length === 0) {
+    throw new BadRequestException("Updated donation information not found");
+  }
+  console.log("request body: ", req.body);
+
   try {
-     const updatedDonation = await donationServiceImp.updateDonation(req.params.donationId, req.body);
+     const response = await donationServiceImp.updateDonation(req.params.donationId, req.body);
 
-     if (updatedDonation == null) {
-          return res.status(404).json({ message: `No Donation found with ID ${req.params.donationId}`})
+     if (!response.success) {
+        return res.status(response.success ? 200 : 400).json(response);
      }
-
-     return res.status(200).json({ message: "Donation updated successfully!", updatedDonation });
+    return res.status(response.success ? 201 : 400).json(response);
   } catch (error) {
     return res.status(500).json({
       message: `Error updating the donation with ID ${req.params.donationId}`,
@@ -128,11 +141,17 @@ donationRouter.get("/nearby/user/:userId", async (req, res) => {
 
 
 donationRouter.delete("/:donationId", async (req, res) => {
+    if (!req.params.donationId || req.params.donationId == "") {
+       throw new BadRequestException("Donation ID cannot be null/empty");
+    }
+
     try{
-        const donation =  await donationServiceImp.deleteDonation(req.params.donationId);
-        return res.status(201).json({ message: "Donation deleted successfullty!", donation});
+        const response =  await donationServiceImp.deleteDonation(req.params.donationId);
+        return res.status(response.success ? 200 : 400).json(response);
     }catch(error){
-        return res.status(500).json({ message: "Error deleting Donation", error});
+      const status = error.statusCode || 500;
+      const errorMessage = error.message || "Unexpected Error occured while deleting Donation"
+      return res.status(status).json({ message: errorMessage});
     }
 });
 
