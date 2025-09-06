@@ -3,6 +3,8 @@ import needServiceImp from "../service/needServiceImp.mjs";
 import upload, { MAX_IMAGE_LIMIT } from "../Config/multer.mjs";
 import { extractToken } from "../service/keycloakService.mjs";
 import BadRequestException from "../exceptions/BadRequestException.mjs";
+import { successResponse, errorResponse } from "../model/dto/Response.mjs";
+
 const needRouter = express.Router();
 
 needRouter.post(
@@ -10,11 +12,12 @@ needRouter.post(
   upload.array("images", MAX_IMAGE_LIMIT),
   async (req, res) => {
 
-    const token = await extractToken(req);
-
     try {
+      const token = await extractToken(req);
+
       const formData = req.body;
-      console.log("need data: ", formData);
+      validateRequestBody(formData);
+      
       const images = req.files?.map(file => ({
         data: file.buffer,
         contentType: file.mimetype,
@@ -26,15 +29,14 @@ needRouter.post(
         images
       };
 
-      console.log("need data: ", needData);
-      const response = await needServiceImp.createNeed(needData, token);
+      const need = await needServiceImp.createNeed(needData, token);
 
-      return res.status(response.success ? 201 : 400).json(response);
-  
+      return successResponse(res, need, "Need Created Successfully !", 200);  
     } catch (error) {
       const status = error.statusCode || 500;
-      const errorMessage = error.message || "Unexpected Error occured while creating need"
-      return res.status(status).json({ message: errorMessage});
+      const message = error.message || "Unexpected Error While Creating need";
+
+      return errorResponse(res, message, status);
     }
   }
 );
@@ -43,117 +45,126 @@ needRouter.post(
 needRouter.get("/all", async (req, res) => {
   try {
     const needs = await needServiceImp.getAllNeeds();
-    return res.status(200).json({ message: "Fetched all needs successfully!", needs });
+
+    return successResponse(res, needs, "Fetched All Needs Successfully!", 200);
   } catch (error) {
-    return res.status(500).json({ message: "Error fetching needs", error: error.message });
+    const status = error.statusCode || 500;
+    const message = error.message || "Unexpected Error While Fetching All Needs";
+
+    return errorResponse(res, message, status);
   }
 });
 
 
 needRouter.get("/:needId", async (req, res) => {
   try {
-    const need = await needServiceImp.getNeedByNeedId(req.params.needId);
+    const { needId } = req.params;
+    validateParameter(needId, "Need ID");
 
-    if (!need) {
-      return res.status(404).json({ message: `Need with ID ${req.params.needId} not found` });
-    }
+    const need = await needServiceImp.getNeedByNeedId(needId);
 
-    return res.status(200).json({ message: "Need fetched successfully!", need });
+    return successResponse(res, need, "Fetched Need Successfully!", 200);
   } catch (error) {
-    return res.status(500).json({
-      message: `Error fetching the need with ID ${req.params.needId}`,
-      error: error.message
-    });
+    const status = error.statusCode || 500;
+    const message = error.message || "Unexpected Error While Fetching Need";
+
+    return errorResponse(res, message, status);
   }
 });
 
 
 needRouter.get("/createdBy/:createdBy", async (req, res) => {
-    if (!req.params.createdBy || req.params.createdBy == "") {
-      throw new BadRequestException("CreatedBy Cannot be null/empty");
-    }
-
     try {
-        const response = await needServiceImp.getNeedsByCreatedBy(req.params.createdBy);
+        const { createdBy } = req.params;
+        validateParameter(createdBy, "CreatedBy");
 
-        if (!response.success) {
-          return res.status(404).json(response)
-        }
+        const needs = await needServiceImp.getNeedsByCreatedBy(createdBy);
 
-        return res.status(200).json(response);
+        return successResponse(res, needs, "Fetched Needs Successfully!", 200);
     } catch (error) {
-        return res.status(500).json({
-          message: `Error fetching the needs with ID ${req.params.createdBy}`,
-          error: error.message
-       });
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching Needs By CreatedBy";
+
+        return errorResponse(res, message, status);
     }
 });
 
 
 needRouter.put("/:needId", async (req, res) => {
-  if (!req.params.needId || req.params.needId == "") {
-    throw new BadRequestException("Need ID cannot be null");
-  }
-
-  if (!req.body || Object.keys(req.body).length === 0) {
-    throw new BadRequestException("Updated need information not found");
-  }
-  console.log("request body: ", req.body);
-
   try {
-     const response = await needServiceImp.updateNeed(req.params.needId, req.body);
+    const { needId } = req.params;
+    validateParameter(needId, "Need ID");
 
-     if (!response.success) {
-        return res.status(response.success ? 200 : 400).json(response);
-     }
-    return res.status(response.success ? 201 : 400).json(response);
+    const requestBody = req.body;
+    validateRequestBody(requestBody);
+
+    const need = await needServiceImp.updateNeed(needId, requestBody);
+
+    return successResponse(res, need, "Updated Need Successfully!", 200);
   } catch (error) {
-    return res.status(500).json({
-      message: `Error updating the need with ID ${req.params.needId}`,
-      error: error.message
-    });
+    const status = error.statusCode || 500;
+    const message = error.message || "Unexpected Error While Updating Need";
+
+    return errorResponse(res, message, status);
   }
 });
 
 needRouter.post("/filter/create", async (req, res) => {
-  console.log("start");
   try {
-     
-     const needs = await needServiceImp.getNeedByFilter(req.body);
+    const requestBody = req.body;
+    validateRequestBody(requestBody);
 
-     return res.status(200).json({ message: "Need filtered successfully!", needs });
+    const needs = await needServiceImp.getNeedByFilter(requestBody);
+
+    return successResponse(res, needs, "Filtered Needs Successfully!", 200);
   } catch (error) {
-    return res.status(500).json({
-      message: `Error filtering the needs`,
-      error: error.message
-    });
-  }s
+    const status = error.statusCode || 500;
+    const message = error.message || "Unexpected Error While Filtering Need";
+
+    return errorResponse(res, message, status);
+  }
 });
 
 needRouter.get("/nearby/user/:userId", async (req, res) => {
   try {
-    const response = await needServiceImp.getNearbyNeeds(req.params.userId);
-    return res.status(response.success ? 201 : 400).json(response);
+    const { userId } = req.params;
+    validateParameter(userId);
+
+    const needs = await needServiceImp.getNearbyNeeds(userId);
+    return successResponse(res, needs.data, needs.message, needs.success ? 200 : 500);
   } catch (error) {
     const status = error.statusCode || 500;
-    const errorMessage = error.message || "Unexpected Error occured while fetching nearby needs"
-    return res.status(status).json({ message: errorMessage});
+    const message = error.message || "Unexpected Error While Fetching Nearby Needs";
+
+    return errorResponse(res, message, status);
   }
 });
 
 needRouter.delete("/:needId", async (req, res) => {
-    if (!req.params.needId || req.params.needId == "") {
-       throw new BadRequestException("Need ID cannot be null/empty");
-    }
-
     try{
-        const response =  await needServiceImp.deleteNeed(req.params.needId);
-        return res.status(response.success ? 200 : 400).json(response);
+      const { needId } = req.params;
+      validateParameter(needId);
+
+      const response =  await needServiceImp.deleteNeed(needId);
+      return successResponse(res, response.data, response.message, response.success ? 200 : 500);
     }catch(error){
       const status = error.statusCode || 500;
-      const errorMessage = error.message || "Unexpected Error occured while deleting need"
-      return res.status(status).json({ message: errorMessage});
+      const message = error.message || "Unexpected Error While Fetching Deleting Need";
+
+      return errorResponse(res, message, status);
     }
 });
+
+function validateParameter(param, type) {
+    if (!param) {
+      throw new BadRequestException(`${type} is required or is invalid format`);
+    }
+}
+
+function validateRequestBody(requestBody) {
+    if (!requestBody || Object.keys(requestBody).length === 0) {
+       throw new BadRequestException("No Request Found: Request Body Cannot Be Empty")
+    }
+}
 
 export default needRouter;

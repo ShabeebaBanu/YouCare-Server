@@ -45,26 +45,17 @@ const userServiceImp = {
             };
 
             const response = await createUser(newUser, userData.role);
-            console.log(response);
-            if (response.success) {
-                return { success: true, message: response.userId}
-            }
 
-            return { success: false, message: "Failed to create user"}
+            return response;
 
         } catch (error) {
-
-            if (error) {
-                throw new KeycloakErrorException("Error Creating User : " + error);
-            } else {
-                throw new KeycloakErrorException("Unexpected error while creating user ");
-            }
+            const errorMessage = error.message || "Unexpected Error Occured While Creating User"
+            throw new Error(errorMessage); 
         }
     },
 
     async sendOtp(email) {
         const isEmailExist = await isEmailAlreadyRegistered(email);
-        
         if (isEmailExist) {
             throw new KeycloakErrorException("Email Already Registered");
         }
@@ -83,21 +74,20 @@ const userServiceImp = {
             if (sendResponse.success && saveResponse.success) {
                 return {
                     success: true,
-                    message: "OTP Saved & sent successfully"
+                    message: "OTP Saved & sent successfully",
+                    data: null
                 };
             }
             
             return {
                     success: false,
-                    message: "Failed to save or sent the OTP"
+                    message: "Failed to save or sent the OTP",
+                    data: null
             };
 
         } catch (error) {
-            if (error) {
-                throw new Error("Error sending OTP Mail : " + error);
-            } else {
-                throw new Error("Unexpected error while geerating otp ");
-            }
+            const errorMessage = error.message || "Unexpected Error Occured While Sending OTP"
+            throw new Error(errorMessage); 
         }
     },
 
@@ -147,8 +137,13 @@ const userServiceImp = {
 
 
     async verifyOtp(email, otp) {  
-       return await otpServiceImp.verifyOtp(email, otp);
-    } ,
+        try{
+           return await otpServiceImp.verifyOtp(email, otp);
+        } catch (error) {
+           const errorMessage = error.message || "Unexpected Error Occured While Verifying OTP"
+           throw new Error(errorMessage); 
+        } 
+    },
 
     async getAllUsers() {
         return await userRepository.getAllUsers();
@@ -158,13 +153,14 @@ const userServiceImp = {
         try{
            const response = await getUserDetailsByUserId(userId);
            if (!response) {
-              return { success: false, message: "user deatils not found"}
+              throw new ResourceNotFoundException("User Details Not Found");
            }
 
-           const userRole =await extractUserRole(token);
+           const userRole = await extractUserRole(token);
            if (!userRole.success) {
                throw new Error(userRole.message);
-            }
+           }
+
            const formatResponse = {
              id: response.id,
              username: response.username,
@@ -175,13 +171,10 @@ const userServiceImp = {
              organizationAddress: response.attributes.organizationAddress[0] || "",
              userType: userRole.message[0]
            }
-           return { success: true, data: formatResponse}
+           return formatResponse;
         } catch (error) {
-           if (error) {
-                throw new Error("Error fetching user details : " + error);
-           } else {
-                throw new Error("Unexpected error while fetching user details ");
-           }
+           const errorMessage = error.message || "Unexpected Error Occured While Fetching User Details"
+           throw new Error(errorMessage);
         }
     },
 

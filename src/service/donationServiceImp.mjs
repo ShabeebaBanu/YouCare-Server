@@ -10,28 +10,25 @@ import BadRequestException from "../exceptions/BadRequestException.mjs";
 
 const donationServiceImp = {
   async createDonation(donationData, token) {
-    console.log("Creating Donation : ", donationData);
+    try {
+      const categoryName = donationData.category;
+      const category = await categoryServiceImp.isCategoryExistByName(categoryName);
+      if (!category) {
+        category = await categoryServiceImp.createCategory({ name : categoryName});
+      }
 
-    const categoryName = donationData.category;
-    const category = await categoryServiceImp.isCategoryExistByName(categoryName);
-
-    if (!category) {
-      category = await categoryServiceImp.createCategory({ name : categoryName});
-    }
-
-    const userRole =await extractUserRole(token);
+      const userRole = await extractUserRole(token);
       if (!userRole.success) {
         throw new Error(userRole.message);
-    }
+      }
 
-    try {
-       return await donationRepository.createDonation({
+      return await donationRepository.createDonation({
         ...donationData,
         category: category._id,
-        userType: userRole.message[0]
-       });
+        userType: userRole.data[0]
+      });
     } catch (error) {
-      const errorMessage = error.message || "Unexpected Error occured while creating user"
+      const errorMessage = error.message || "Unexpected Error occured while creating Donation";
       throw new Error(errorMessage); 
     }
     
@@ -42,127 +39,129 @@ const donationServiceImp = {
   },
 
   async getAllDonations() {
-    return await donationRepository.getAllDonations();
+    try{
+        return await donationRepository.getAllDonations();
+    } catch(error) {
+        const errorMessage = error.message || "Unexpected Error Occured While Fetching All Donations"
+        throw new Error(errorMessage); 
+    }
   },
 
   async updateDonation(donationId, updatedData) {
     const existingDonation = await donationRepository.getDonationByDonationId(donationId);
     if (!existingDonation) {
-      throw new ResourceNotFoundException("No Donation found with ID : ", donationId);
+      throw new ResourceNotFoundException("No Donation Found With Given Donation ID");
     }
 
     if (existingDonation.status !== donationStatusEnum.AVAILABLE) {
-      throw new ResourceNotFoundException("Donation Cannot Be Updated, As Donation Is In_Process Or Already Completed");
-    }
-
-    const categoryName = updatedData.category;
-    const category = await categoryServiceImp.isCategoryExistByName(categoryName);
-
-    if (!category) {
-      category = await categoryServiceImp.createCategory({ name : categoryName});
+      throw new BadRequestException("Donation Cannot Be Updated, As Donation Is In_Process Or Already Completed");
     }
 
     try {
-       const response = await donationRepository.updateDonation(
-        donationId, 
-        {
-        ...updatedData,
-        category: category._id}
+      const categoryName = updatedData.category;
+      const category = await categoryServiceImp.isCategoryExistByName(categoryName);
+
+      if (!category) {
+        category = await categoryServiceImp.createCategory({ name : categoryName});
+      }
+
+      const response = await donationRepository.updateDonation(
+      donationId, 
+      {
+      ...updatedData,
+      category: category._id}
       );
-       if (!response) {
-          return { success: false, message: "Failed to update donation" };
-       }
-       return { success: true, message: "Donation updated", data: response };
+
+      return response;
 
     } catch(error) {
-      const errorMessage = error.message || "Unexpected Error occured while updating donation"
+      const errorMessage = error.message || "Unexpected Error Occured While Updating Donation"
       throw new Error(errorMessage); 
     }
   },
 
   async getNearbyDonations(userId) {
-      if (!userId || userId === "") {
-          throw new ResourceNotFoundException("userId cannot be null");
-      }
-  
       try {
           const userDetails = await getUserDetailsByUserId(userId);
           if (!userDetails) {
-              return { success: false, message: "No user data found" };
+            throw new ResourceNotFoundException("No User Found With Given User ID")
           }
           
-          const district = userDetails.attributes.district[0] || "";
-          console.log("district: ", district);
+          const district = userDetails?.attributes?.district?.[0] || "";
 
-          if (!district ) {
-              return { success: false, message: "User has no location info" };
+          if (!district) {
+            return { success: false, message: "User Has No Location Information", data: []};
           }
   
           const districtData = await districtRepository.getDistrictByName(district);
-            console.log("districtData: ", districtData);
-            if (!districtData) {
-                return { success: false, message: "No Doners Near By Your Location "+ districtData.name };
+          if (!districtData) {
+            return { success: false, message: "User Has No Location Information", data: []};
           }
+
           const districtId = districtData._id;
-          console.log("districtId: ", districtId);
 
           const nearByDonations = await donationRepository.getNearbyDonations(districtId);
-          console.log("nearby donations response: ", nearByDonations)
   
-          if (!nearByDonations || nearByDonations.length === 0) {
-              return { success: false, message: "No nearby donations found", data:[] };
-          }
-  
-          return {
-            success: true,
-            message: "Nearby donations fetched successfully",
-            data: nearByDonations
-          };
-  
+          return { success: true, message: "Nearby Donations Fetched successfully", data: nearByDonations};
       } catch (error) {
-          throw new Error(error.message || "Unexpected error occurred while fetching nearby donations");
+          const errorMessage = error.message || "Unexpected Error Occured While Fetching NearBy Donations"
+          throw new Error(errorMessage);
       }
   },
 
   async getDonationsByCreatedBy(createdBy) {
-      const userDetails = await getUserDetailsByUserId(createdBy);
-      if (!userDetails) {
-          return { success: false, message: "No user found with ID ", createdBy };
-      }
-  
       try {
+        const userDetails = await getUserDetailsByUserId(createdBy);
+        if (!userDetails) {
+            throw new ResourceNotFoundException("Failed to Fetch Donations : No User Found With Given ID");
+        }
+
         const response = await donationRepository.getDonationsByCreatedBy(createdBy);
-        console.log("response: ", response);
-      if (!response.length > 0 || !response) {
-        return {success: false, message: "No donations found", data: []}
-      }
-        return {success: true, message: "donations fetched successfully", data: response}
+        return response;
       } catch (error) {
-        const errorMessage = error.message || "Unexpected Error occured while fetching donation"
+        const errorMessage = error.message || "Unexpected Error occured while fetching donations By CreatedBy"
         throw new Error(errorMessage); 
       }    
+  },
+
+  async getDonationByFilter(filterRequest) {
+    try{
+      const response = donationRepository.filterDonation(filterRequest.district, filterRequest.category, filterRequest.userType);
+      return response;
+    } catch(error) {
+      const errorMessage = error.message || "Unexpected Error occured while Filtering Donation"
+      throw new Error(errorMessage); 
+    }    
   },
   
 
   async deleteDonation(donationId) {
-      const donationDetail = await donationRepository.getDonationByDonationId(donationId);
-      if (!donationDetail) {
-          throw new ResourceNotFoundException("No donation found with ID : ", donationId);
-      }
-      
-      const donationStatus = donationDetail.status;
-      if (donationStatus == donationStatusEnum.PENDING) {
-        throw new BadRequestException("Donation Cannot be deleted, As Donation Is In_Process");
-      }
-  
-      const response = await donationRepository.deleteDonation(donationId);
-      if (response.deletedCount === 0) {
-        return { success: false, message: "No Donation found with ID : " + donationId };
-      }
-      return { success: true, message: "Donation deleted successfully" }; 
+    try{
+        const donationDetail = await donationRepository.getDonationByDonationId(donationId);
+        if (!donationDetail) {
+            throw new ResourceNotFoundException("No Donation Found With Given ID");
+        }
+        
+        const donationStatus = donationDetail.status;
+        if (donationStatus == donationStatusEnum.PENDING) {
+          throw new BadRequestException("Donation Cannot Be Deleted, As Donation Is In_Process");
+        }
+    
+        const response = await donationRepository.deleteDonation(donationId);
+        if (response.deletedCount === 0) {
+          return { success: false, message: "Failed To Delete Donation", data: null};
+        }
+
+        return { success: true, message: "Donation Deleted Successfully" , data: response};
+    } catch (error) {
+        const errorMessage = error.message || "Unexpected Error occured while Deleting Donation";
+        throw new Error(errorMessage); 
+    }
+       
   }
 
 };
 
 
 export default donationServiceImp;
+ 

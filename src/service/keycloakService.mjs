@@ -52,11 +52,11 @@ export async function createUser(userData, role) {
             const roleAssignResponse = await AssignRole(userId, rolePayload);
 
             if (roleAssignResponse.success) {
-                return { success: true, message: "User created and role assigned successfully", userId };
+                return { success: true, message: "User created and role assigned successfully", data: userId };
             }
         }
 
-        return { success: false, message: "User created and role assignment failed"};
+        return { success: false, message: "User created and role assignment failed", data: null};
 
     } catch (error) {
         throw new KeycloakErrorException(error.response.data.errorMessage);
@@ -159,16 +159,22 @@ export async function getUserDetailsByEmail(email) {
 };
 
 export async function extractUserRole(token) {
-    const decoded = jwt.decode(token, {complete: true});
+    try {
+        const decoded = jwt.decode(token, {complete: true});
+        if (!decoded) {
+            return { success: false, message: "Invalid Token, Unabel to Decode Token", data: null};
+        }
 
-    if (!decoded) {
-        return { success: false, message: "Invalid Token, Unabel to decode token"};
+        const clientId = process.env.KEYCLOAK_CLIENT;
+        const realmRoles = decoded.payload?.resource_access?.[clientId]?.roles || [];
+        if (!realmRoles) {
+            return { success: false, message: "User Role Data Not Found", data: null};
+        }
+    
+        return { success: true, message:"Role Fetched Successfully", data: realmRoles};
+    } catch(error) {
+        throw new Error(error.message);
     }
-
-    const clientId = process.env.KEYCLOAK_CLIENT;
-    const realmRoles = decoded.payload?.resource_access?.[clientId]?.roles || [];
-
-    return { success: true, message: realmRoles};
 };
 
 export async function extractToken(request) {

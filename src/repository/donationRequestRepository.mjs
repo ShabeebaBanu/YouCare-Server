@@ -1,4 +1,3 @@
-import Donation from "../model/Donation.mjs";
 import DonationRequest from "../model/DonationRequest.mjs";
 
 const donationRequestRepository = {
@@ -12,6 +11,24 @@ const donationRequestRepository = {
         return await DonationRequest.find({});
     },
 
+    async getDonationRequestById(donationRequestId) {
+        return await DonationRequest.findById(donationRequestId);
+    },
+
+    async updateStatusById(donationRequestId, value) {
+        try {
+            const updatedRequest = await DonationRequest.findByIdAndUpdate(
+                donationRequestId,        
+                { status : value },       
+                { new: true }             
+            );
+            return updatedRequest;
+        } catch (error) {
+            console.error("Error updating donation request:", error);
+            throw error;
+        }
+    },
+
     async getDonationRequestByCreatedBy(createdBy) {
         return await DonationRequest.find({ donationCreatedBy : createdBy})
             .populate({
@@ -21,7 +38,7 @@ const donationRequestRepository = {
                 { path: 'district', select: 'name' }
             ]
             })
-             .sort({createdAt : -1});
+            .sort({createdAt : -1});
     },
 
     async getDonationRequestByUserId(userId) {
@@ -50,6 +67,18 @@ const donationRequestRepository = {
                 { path: 'district', select: 'name' }
             ]
         }).sort({createdAt : -1});
+    },
+
+    async getDonationRequestByDonationId(donationId) {
+        return await DonationRequest.find({ donationId : donationId})
+            .populate({
+            path: 'donationId',          
+            populate: [
+                { path: 'category', select: 'name' },
+                { path: 'district', select: 'name' }
+            ]
+            })
+            .sort({createdAt : -1});
     },
 
     async deleteDonationRequest(donationRequestId) {

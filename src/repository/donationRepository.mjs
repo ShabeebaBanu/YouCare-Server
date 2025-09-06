@@ -49,8 +49,6 @@ const donationRepository = {
             return [];
         }
     
-        console.log("Final query:", query);
-    
         return await Donation.find(query)
             .populate('category', 'name')
             .populate('district', 'name')
@@ -67,6 +65,21 @@ const donationRepository = {
     async updateDonation(donationId, updatedData) {
         return await Donation.findByIdAndUpdate(donationId, updatedData, { new : true })
     },
+
+    async updateStatusById(donationId, value) {
+        try {
+            const updatedRequest = await Donation.findByIdAndUpdate(
+                donationId,       
+                { status : value },       
+                { new: true }             
+            );
+            return updatedRequest;
+        } catch (error) {
+            console.error("Error updating donation status:", error);
+            throw error;
+        }
+    },
+    
 
     async deleteDonation(donationId) {
         return await Donation.deleteOne({ _id: donationId});

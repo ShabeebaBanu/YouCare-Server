@@ -2,80 +2,96 @@ import express from "express";
 import userServiceImp from "../service/userServiceImp.mjs";
 import BadRequestException from "../exceptions/BadRequestException.mjs";
 import { extractToken } from "../service/keycloakService.mjs";
+import { successResponse, errorResponse } from "../model/dto/Response.mjs";
 
 const userRouter = express.Router();
 
 userRouter.post("/create", async (req, res) => {
     try{
-        if (!req.body.email || req.body.email == "") {
+        const requestBody = req.body;
+        validateRequestBody(requestBody);
+
+        if (!requestBody.email || requestBody.email == "") {
            throw new BadRequestException("Email is Required");
         }
 
-        const response = await userServiceImp.createUser(req.body);
-        return res.status(response.success ? 201 : 400).json(response);
+        const response = await userServiceImp.createUser(requestBody);
+
+        return successResponse(res, response.data, response.message, response.success ? 200 : 500);
     }catch(error){
         const status = error.statusCode || 500;
-        const errorMessage = error.message || "Unexpected Error occured while creating user"
-        return res.status(status).json({ message: errorMessage});
+        const message = error.message || "Unexpected Error While Creating User";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 userRouter.post("/otp", async (req, res) => {
     try{
-        const response = await userServiceImp.sendOtp(req.body.email);
-        const test = res.status(response.success ? 200 : 400).json(response);
-        console.log("test:", test);
-        return test;
+        const requestBody = req.body;
+        validateRequestBody(requestBody);
+
+        const response = await userServiceImp.sendOtp(requestBody.email);
+
+        return successResponse(res, response.data, response.message, response.success ? 200 : 500);
     } catch (error) {
         const status = error.statusCode || 500;
-        const errorMessage = error.message || "Unexpected Error occured while sending OTP"
-        console.error("Error in /otp:", errorMessage);
-        return res.status(status).json({ success: false, message: errorMessage });
+        const message = error.message || "Unexpected Error While Sending OTP";
+
+        return errorResponse(res, message, status);
     }
 });
 
 userRouter.post("/verify/otp", async (req, res) => {
-    if (!req.body.otp || req.body.otp == "") {
-        return res.status(400).json({ success: false, message: "OTP cannot be null" });
-    }
-
-    if (!req.body.email || req.body.email == "") {
-        return res.status(400).json({ success: false, message: "Email cannot be null" });
-    }
-
     try {
-        const response = await userServiceImp.verifyOtp(req.body.email, req.body.otp);
-        return res.status(response.success ? 200 : 400).json(response);
+        const requestBody = req.body;
+        validateRequestBody(requestBody);
+
+        const { otp, email } = requestBody;
+
+        if (!otp || otp === "" || !email || email === "") {
+            throw new BadRequestException("Email and OTP Cannot be empty/ null")
+        }
+
+        const response = await userServiceImp.verifyOtp(email, otp);
+
+        return successResponse(res, response.data, response.message, response.success ? 200 : 500);
     } catch (error) {
-        const errorMessage = error.message || "Unexpected Error occured while verfying OTP"
-        console.error("Error in /verify/otp:", errorMessage);
-        return res.status(500).json({ success: false, message: errorMessage });
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Verifying OTP";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 userRouter.get("/all", async (req, res) => {
     try{
-        const users =  await userServiceImp.getAllUsers(req, res);
-        return res.status(201).json({ message: "Fetched all users successfullty!", users});
+        const users =  await userServiceImp.getAllUsers();
+
+        return successResponse(res, users, "Fetched All Users Successfully!", 200);
     }catch(error){
-        return res.status(500).json({ message: "Error fetching users", error});
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching All Users";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 userRouter.get("/:userId", async (req, res) => {
-    if (!req.params.userId) {
-        throw new BadRequestException("UserId cannot be null");
-    }
-
-    const token = await extractToken(req);
-
     try{
-        const response = await userServiceImp.getUserByUserId(req.params.userId, token);
-        return res.status(response.success ? 200 : 400).json(response);
+        const { userId } = req.params;
+        validateParameter( userId, "User ID");
+
+        const token = await extractToken(req);
+
+        const response = await userServiceImp.getUserByUserId(userId, token);
+        
+        return successResponse(res, response, "Fetched User Details Successfully!", 200);
     }catch(error){
         const status = error.statusCode || 500;
-        const errorMessage = error.message || "Unexpected Error occured while fetching user"
-        return res.status(status).json({ message: errorMessage});
+        const message = error.message || "Unexpected Error While Fetching User Details";
+
+        return errorResponse(res, message, status);
     }
 });
 
@@ -166,5 +182,18 @@ userRouter.delete("/:userId", async (req, res) => {
         return res.status(500).json({ message: `Error deleting the user with ID ${req.params.userId}`});
     }
 });
+
+
+function validateParameter(param, type) {
+    if (!param) {
+      throw new BadRequestException(`${type} is required or is invalid format`);
+    }
+}
+
+function validateRequestBody(requestBody) {
+    if (!requestBody || Object.keys(requestBody).length === 0) {
+       throw new BadRequestException("No Request Found: Request Body Cannot Be Empty")
+    }
+}
 
 export default userRouter;

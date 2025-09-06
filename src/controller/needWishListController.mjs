@@ -1,55 +1,95 @@
 import express from "express";
 import needWishListRepository from '../repository/needWishListRepository.mjs'
+import { successResponse, errorResponse } from "../model/dto/Response.mjs";
 
 const wishListRoute = express.Router();
 
 wishListRoute.post("/create", async (req, res) => {
     try {
-        const wishList = await needWishListRepository.createNeedWishList(req.body);
-        return res.status(201).json({ message: "WishList Created Successfully!", wishList });
+        const requestBody = req.body;
+        validateRequestBody(requestBody);
+
+        const wishList = await needWishListRepository.createNeedWishList(requestBody);
+        
+        return successResponse(res, wishList, "Wishlist Created Successfully !", 200);
     } catch (error) {
-        console.error("Wishlist creation error:", error);
-        return res.status(500).json({ message: "Error creating Wishlist", error: error.message });
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Creating Wishlist";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 wishListRoute.get("/all", async (req, res) => {
     try{
-        const wishlist =  await needWishListRepository.getAllNeedWishList();
-        return res.status(201).json({ message: "Fetched all Wishlist successfully!", wishlist});
+        const wishlists =  await needWishListRepository.getAllNeedWishList();
+
+        return successResponse(res, wishlists, "Fetched All Wishlists Successfully!", 200);
     }catch(error){
-        return res.status(500).json({ message: "Error fetching Wishlist", error});
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching All Wishlists";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 wishListRoute.get("/createdBy/:createdBy", async (req, res) => {
     try {
-        const wishList = await needWishListRepository.getNeedWishListByCreatedBy(req.params.createdBy);
-        return res.status(201).json({ message: "WishList Fetched Successfully!", wishList });
+        const { createdBy } = req.params;
+        validateParameter(createdBy, "CreatedBy");
+
+        const wishLists = await needWishListRepository.getNeedWishListByCreatedBy(createdBy);
+
+        return successResponse(res, wishLists, "Fetched Wishlists Successfully!", 200);
     } catch (error) {
-        console.error("Wishlist Fetching error:", error);
-        return res.status(500).json({ message: "Error Fetching Wishlist", error: error.message });
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching Wishlists By CreatedBy";
+
+        return errorResponse(res, message, status);
     }
 });
 
 wishListRoute.get("/user/:userId", async (req, res) => {
     try {
-        const wishList = await needWishListRepository.getNeedWishListByUserId(req.params.userId);
-        return res.status(201).json({ message: "WishList Fetched Successfully!", wishList });
+        const { userId } = req.params;
+        validateParameter( userId, "User ID");
+
+        const wishLists = await needWishListRepository.getNeedWishListByUserId(userId);
+        return successResponse(res, wishLists, "Fetched Wishlists Successfully!", 200);
     } catch (error) {
-        console.error("Wishlist Fetching error:", error);
-        return res.status(500).json({ message: "Error Fetching Wishlist", error: error.message });
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching Wishlists By UserId";
+        
+        return errorResponse(res, message, status);
     }
 });
 
 wishListRoute.delete("/:wishlistId", async (req, res) => {
     try{
-        const wishList =  await needWishListRepository.deleteNeedWishList(req.params.wishlistId);
-        return res.status(201).json({ message: "Wishlist deleted successfullty!", wishList});
+        const { wishlistId } = req.params;
+        validateParameter(wishlistId);
+
+        const wishList =  await needWishListRepository.deleteNeedWishList(wishlistId);
+
+        return successResponse(res, wishList, "Wishlist Deleted Successfully", 200);
     }catch(error){
-        return res.status(500).json({ message: "Error deleting Wishlist", error});
+        const status = error.statusCode || 500;
+        const message = error.message || "Unexpected Error While Fetching Deleting Wishlist";
+        
+        return errorResponse(res, message, status);
     }
 });
 
+function validateParameter(param, type) {
+    if (!param) {
+      throw new BadRequestException(`${type} is required or is invalid format`);
+    }
+}
+
+function validateRequestBody(requestBody) {
+    if (!requestBody || Object.keys(requestBody).length === 0) {
+       throw new BadRequestException("No Request Found: Request Body Cannot Be Empty")
+    }
+}
 
 export default wishListRoute;
